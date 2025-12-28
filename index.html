@@ -2,71 +2,91 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>The Owl Math Master</title>
-    <!-- Load React and Babel -->
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Owl Math Master: Ultimate Edition</title>
+    <!-- React & Babel -->
     <script src="https://unpkg.com/react@18/umd/react.development.js"></script>
     <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
-    <!-- Load Tailwind CSS for styling -->
+    <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
         body {
-            background-color: #f0fdf4; /* Light green background */
+            background-color: #f0f9ff; 
             font-family: 'Comic Sans MS', 'Chalkboard SE', sans-serif;
-            touch-action: manipulation;
+            touch-action: manipulation; /* Prevents double-tap zoom on mobile */
+            -webkit-tap-highlight-color: transparent;
         }
+        
+        /* Responsive Input Styling */
         .digit-input {
-            width: 50px;
-            height: 60px;
-            font-size: 32px;
+            width: 100%;
+            height: 100%;
+            aspect-ratio: 1/1; /* Square inputs look better on mobile */
+            font-size: clamp(1.2rem, 4vw, 1.8rem); /* Responsive font size */
             text-align: center;
-            border: 3px solid #cbd5e1;
-            border-radius: 12px;
+            border: 2px solid #cbd5e1;
+            border-radius: 8px;
             background: white;
             transition: all 0.2s;
             color: #333;
+            font-weight: bold;
+            padding: 0;
+            margin: 0;
         }
+        
         .digit-input:focus {
             border-color: #3b82f6;
             outline: none;
-            transform: scale(1.1);
-            box-shadow: 0 0 10px rgba(59, 130, 246, 0.5);
+            transform: scale(1.05);
             background-color: #eff6ff;
+            z-index: 50;
+            box-shadow: 0 2px 4px rgba(59, 130, 246, 0.3);
         }
+        
         .digit-input.correct {
             background-color: #dcfce7;
             border-color: #22c55e;
             color: #15803d;
         }
+        
         .digit-input.wrong {
             background-color: #fee2e2;
             border-color: #ef4444;
             animation: shake 0.4s;
         }
-        /* The Owl Blocker Animation */
+        
         .owl-blocker {
-            transition: all 0.6s cubic-bezier(0.34, 1.56, 0.64, 1);
-            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+            transition: all 0.5s ease-in-out;
+            animation: float 3s ease-in-out infinite;
         }
+
+        /* Prevent scrollbars from looking ugly on mobile */
+        .no-scrollbar::-webkit-scrollbar {
+            display: none;
+        }
+        .no-scrollbar {
+            -ms-overflow-style: none;
+            scrollbar-width: none;
+        }
+
         @keyframes shake {
             0%, 100% { transform: translateX(0); }
-            25% { transform: translateX(-6px); }
-            75% { transform: translateX(6px); }
+            25% { transform: translateX(-4px); }
+            75% { transform: translateX(4px); }
         }
-        .bounce {
+        @keyframes float {
+            0%, 100% { transform: translateY(0); }
+            50% { transform: translateY(-3px); }
+        }
+        .bounce-zero {
             animation: bounce 1s infinite;
+            border-color: #eab308;
+            border-width: 3px;
         }
         @keyframes bounce {
             0%, 100% { transform: translateY(-10%); }
             50% { transform: translateY(0); }
-        }
-        .fade-in {
-            animation: fadeIn 0.5s ease-in;
-        }
-        @keyframes fadeIn {
-            from { opacity: 0; }
-            to { opacity: 1; }
         }
     </style>
 </head>
@@ -76,66 +96,87 @@
     <script type="text/babel">
         const { useState, useEffect, useRef } = React;
 
-        // List of 20 problems where the result is < 1000 to maintain grid layout
-        const PROBLEM_SET = [
-            { top: 34, bot: 13 }, // 442 (Intro)
-            { top: 23, bot: 12 }, // 276
-            { top: 42, bot: 21 }, // 882
-            { top: 15, bot: 15 }, // 225
-            { top: 24, bot: 12 }, // 288
-            { top: 32, bot: 12 }, // 384
-            { top: 43, bot: 11 }, // 473
-            { top: 22, bot: 22 }, // 484
-            { top: 31, bot: 21 }, // 651
-            { top: 14, bot: 14 }, // 196
-            { top: 25, bot: 13 }, // 325
-            { top: 16, bot: 15 }, // 240
-            { top: 28, bot: 12 }, // 336
-            { top: 41, bot: 12 }, // 492
-            { top: 33, bot: 13 }, // 429
-            { top: 21, bot: 41 }, // 861
-            { top: 12, bot: 54 }, // 648
-            { top: 13, bot: 32 }, // 416
-            { top: 24, bot: 21 }, // 504
-            { top: 31, bot: 31 }, // 961
-        ];
+        // --- PROBLEM GENERATION LOGIC ---
+        const generateProblem = (level) => {
+            const rand = (min, max) => Math.floor(Math.random() * (max - min + 1)) + min;
+            let top, bot;
 
-        // --- Extracted Input Component to prevent Re-render focus loss ---
-        const InputCell = ({ val, onChange, idx, correctVal, disabled, isZeroCheck, rowPrefix }) => {
+            switch(level) {
+                case 1: // Easy: 1-4 digit x 1 digit
+                    const l1Type = rand(1, 4);
+                    const l1Max = Math.pow(10, l1Type) - 1;
+                    const l1Min = Math.pow(10, l1Type - 1);
+                    top = rand(l1Min, l1Max); 
+                    bot = rand(2, 9);
+                    break;
+                case 2: // Medium: 5-8 digit x 1 digit
+                    const l2Type = rand(5, 8);
+                    const l2Max = Math.pow(10, l2Type) - 1;
+                    const l2Min = Math.pow(10, l2Type - 1);
+                    top = rand(l2Min, l2Max);
+                    bot = rand(2, 9);
+                    break;
+                case 3: // Moderate: 2-4 digit x 2 digit
+                    const l3Type = rand(2, 4);
+                    const l3Max = Math.pow(10, l3Type) - 1;
+                    const l3Min = Math.pow(10, l3Type - 1);
+                    top = rand(l3Min, l3Max);
+                    bot = rand(11, 99);
+                    break;
+                case 4: // Hard: 5-7 digit x 2 digit
+                    const l4Type = rand(5, 7);
+                    const l4Max = Math.pow(10, l4Type) - 1;
+                    const l4Min = Math.pow(10, l4Type - 1);
+                    top = rand(l4Min, l4Max);
+                    bot = rand(11, 99);
+                    break;
+                default:
+                    top = 12; bot = 3;
+            }
+            return { top, bot, level };
+        };
+
+        // --- AUDIO HELPERS ---
+        const playTone = (freq, type = 'sine', dur=0.1) => {
+            const ctx = new (window.AudioContext || window.webkitAudioContext)();
+            const osc = ctx.createOscillator();
+            const gain = ctx.createGain();
+            osc.type = type;
+            osc.frequency.value = freq;
+            osc.connect(gain);
+            gain.connect(ctx.destination);
+            osc.start();
+            gain.gain.exponentialRampToValueAtTime(0.00001, ctx.currentTime + dur);
+            osc.stop(ctx.currentTime + dur);
+        };
+        const playSuccess = () => { playTone(440); setTimeout(()=>playTone(554),100); setTimeout(()=>playTone(659),200); };
+        const playError = () => playTone(150, 'sawtooth', 0.3);
+
+        // --- INPUT COMPONENT ---
+        const InputCell = ({ val, onChange, idx, correctVal, disabled, isZeroCheck, prefix }) => {
             const isCorrect = val === correctVal && val !== '';
             const isWrong = val !== '' && val !== correctVal && !disabled;
-            
-            const handleInputChange = (e) => {
-                const newVal = e.target.value;
-                // Only allow numbers
-                if (!/^\d*$/.test(newVal)) return;
-                
-                // Call parent update
-                onChange(newVal, idx);
 
-                // AUTO-FOCUS LOGIC (Shift Left)
-                // If user typed a single digit, move to the input on the left (idx - 1)
-                // We use setTimeout to allow React to update state/dom first, though mostly synchronous logic handles it.
-                if (newVal.length === 1 && idx > 0) {
-                    const prevId = `${rowPrefix}-${idx - 1}`;
-                    const prevEl = document.getElementById(prevId);
-                    // Only focus if it exists and is not disabled
-                    if (prevEl && !prevEl.disabled) {
-                        prevEl.focus();
-                        prevEl.select(); // Select content so they can overwrite easily
-                    }
+            const handleChange = (e) => {
+                const v = e.target.value;
+                if (!/^\d*$/.test(v)) return;
+                onChange(v, idx);
+                
+                // Auto-shift left logic
+                if (v.length === 1 && idx > 0) {
+                    const prev = document.getElementById(`${prefix}-${idx-1}`);
+                    if (prev && !prev.disabled) { prev.focus(); prev.select(); }
                 }
             };
 
             return (
-                <input 
-                    id={`${rowPrefix}-${idx}`}
-                    type="text" 
+                <input
+                    id={`${prefix}-${idx}`}
                     inputMode="numeric"
                     maxLength="1"
-                    className={`digit-input ${isCorrect ? 'correct' : ''} ${isWrong ? 'wrong' : ''} ${isZeroCheck ? 'border-4 border-yellow-400 bounce' : ''}`}
+                    className={`digit-input ${isCorrect?'correct':''} ${isWrong?'wrong':''} ${isZeroCheck?'bounce-zero':''}`}
                     value={val}
-                    onChange={handleInputChange}
+                    onChange={handleChange}
                     disabled={disabled}
                     placeholder={isZeroCheck ? "0" : ""}
                     autoComplete="off"
@@ -144,323 +185,356 @@
         };
 
         const App = () => {
-            // Game State
-            const [probIndex, setProbIndex] = useState(0);
-            const [topNum, setTopNum] = useState(PROBLEM_SET[0].top);
-            const [bottomNum, setBottomNum] = useState(PROBLEM_SET[0].bot);
+            const [gameState, setGameState] = useState('menu');
+            const [level, setLevel] = useState(1);
+            const [problemNum, setProblemNum] = useState(1);
+            const [score, setScore] = useState(0);
             
-            // Steps: 
-            // 0: Intro
-            // 1: Multiply Ones
-            // 2: Place Zero & Shift Owl
-            // 3: Multiply Tens
-            // 4: Add Rows
-            // 5: Success
-            const [step, setStep] = useState(0);
+            // Math State
+            const [topNum, setTopNum] = useState(0);
+            const [botNum, setBotNum] = useState(0);
             
-            // User Inputs
-            // We store inputs as arrays of strings ['hundreds', 'tens', 'ones']
-            const [row1, setRow1] = useState(['', '', '']); 
-            const [row2, setRow2] = useState(['', '', '']);
-            const [final, setFinal] = useState(['', '', '']);
+            // Grid State
+            const [gridCols, setGridCols] = useState(6);
+            
+            const [row1, setRow1] = useState([]);
+            const [row2, setRow2] = useState([]);
+            const [final, setFinal] = useState([]);
             const [carry, setCarry] = useState('');
             
-            // Feedback Message
-            const [message, setMessage] = useState({ text: `Problem 1/${PROBLEM_SET.length}: Let's help Clancy!`, type: 'neutral' });
+            const [step, setStep] = useState(0);
+            const [message, setMessage] = useState({ text: "", type: "neutral" });
 
-            // Math Constants
-            const topOnes = topNum % 10;
-            const topTens = Math.floor(topNum / 10);
-            const botOnes = bottomNum % 10;
-            const botTens = Math.floor(bottomNum / 10);
-
-            const product1 = topNum * botOnes;
-            const product2 = topNum * botTens;
-            const finalAns = topNum * bottomNum;
-
-            // Helper: Convert number to array of 3 digits (e.g. 102 -> ['1','0','2'])
-            const getDigits = (num) => {
-                const s = num.toString().padStart(3, '0');
-                return [s[0], s[1], s[2]]; 
-            };
-
-            const p1Digits = getDigits(product1);
-            const p2Digits = getDigits(product2 * 10); 
-            const fDigits = getDigits(finalAns);
-
-            // Audio effects
-            const playTone = (freq, type = 'sine') => {
-                const ctx = new (window.AudioContext || window.webkitAudioContext)();
-                const osc = ctx.createOscillator();
-                const gain = ctx.createGain();
-                osc.type = type;
-                osc.frequency.value = freq;
-                osc.connect(gain);
-                gain.connect(ctx.destination);
-                osc.start();
-                gain.gain.exponentialRampToValueAtTime(0.00001, ctx.currentTime + 0.5);
-                osc.stop(ctx.currentTime + 0.5);
-            };
-
-            const playSuccess = () => {
-                playTone(440);
-                setTimeout(() => playTone(554), 100);
-                setTimeout(() => playTone(659), 200);
-            };
-
-            const playError = () => playTone(150, 'sawtooth');
-
-            // --- Logic Functions ---
-
-            const nextProblem = () => {
-                const nextIdx = (probIndex + 1) % PROBLEM_SET.length;
-                setProbIndex(nextIdx);
-                setTopNum(PROBLEM_SET[nextIdx].top);
-                setBottomNum(PROBLEM_SET[nextIdx].bot);
-                resetGame(nextIdx);
-            };
-
-            const resetGame = (idx = probIndex) => {
-                setStep(0);
-                setRow1(['', '', '']);
-                setRow2(['', '', '']);
-                setFinal(['', '', '']);
-                setCarry('');
-                setMessage({ text: `Problem ${idx + 1}/${PROBLEM_SET.length}: Let's calculate!`, type: 'neutral' });
-            };
-
-            // Handlers for Input updates
-            const handleRow1Change = (val, idx) => {
-                const newArr = [...row1];
-                newArr[idx] = val;
-                setRow1(newArr);
-            };
+            // --- COMPUTED VALUES ---
+            const botOnes = botNum % 10;
+            const botTens = Math.floor(botNum / 10);
+            const isTwoDigitBot = botNum >= 10;
             
-            const handleRow2Change = (val, idx) => {
-                const newArr = [...row2];
-                newArr[idx] = val;
-                setRow2(newArr);
+            const prod1 = topNum * botOnes;
+            const prod2 = topNum * botTens;
+            const finalAns = topNum * botNum;
+
+            const getAlignedDigits = (num, totalCols) => {
+                const str = num.toString();
+                const arr = Array(totalCols).fill('');
+                for (let i=0; i < str.length; i++) {
+                    arr[totalCols - 1 - i] = str[str.length - 1 - i];
+                }
+                return arr;
             };
 
-            const handleFinalChange = (val, idx) => {
-                const newArr = [...final];
-                newArr[idx] = val;
-                setFinal(newArr);
+            const p1Digits = getAlignedDigits(prod1, gridCols);
+            const p2Digits = getAlignedDigits(prod2 * 10, gridCols); 
+            const fDigits = getAlignedDigits(finalAns, gridCols);
+
+            const topDigits = getAlignedDigits(topNum, gridCols);
+            const botDigits = getAlignedDigits(botNum, gridCols);
+
+            // --- GAME LOGIC ---
+
+            const startGame = (lvl) => {
+                setLevel(lvl);
+                setProblemNum(1);
+                setScore(0);
+                loadProblem(lvl);
+                setGameState('playing');
+            };
+
+            const loadProblem = (lvl) => {
+                const p = generateProblem(lvl);
+                
+                // Calculate required columns EXACTLY based on result length
+                const maxLen = (p.top * p.bot).toString().length;
+                // Min 3 columns to look decent for small numbers like 12*2=24
+                const newCols = Math.max(3, maxLen); 
+
+                setGridCols(newCols);
+                setTopNum(p.top);
+                setBotNum(p.bot);
+                
+                setRow1(Array(newCols).fill(''));
+                setRow2(Array(newCols).fill(''));
+                setFinal(Array(newCols).fill(''));
+                setCarry('');
+                
+                setStep(1); 
+                setMessage({ text: `Q${problemNum}/10: Multiply ${p.top} × ${p.bot % 10}`, type: "neutral" });
+            };
+
+            const handleNext = () => {
+                if (problemNum >= 10) {
+                    setGameState('summary');
+                } else {
+                    setProblemNum(p => p + 1);
+                    setTimeout(() => loadProblem(level), 0);
+                }
             };
 
             const checkRow1 = () => {
-                const userVal = row1.map(d => d === '' ? '0' : d).join('');
-                if (parseInt(userVal) === product1) {
+                const userVal = parseInt(row1.join('')) || 0;
+                if (userVal === prod1) {
                     playSuccess();
-                    setStep(2);
-                    setMessage({ text: "Great! Now, look at the Owl. What do we do before multiplying by 10?", type: 'neutral' });
+                    if (isTwoDigitBot) {
+                        setStep(2);
+                        setMessage({ text: "Correct! Place the Zero!", type: "neutral" });
+                    } else {
+                        setStep(5);
+                        setScore(s => s + 1);
+                        setMessage({ text: "Excellent!", type: "success" });
+                    }
                 } else {
                     playError();
-                    setMessage({ text: `Not quite! Check: ${topNum} x ${botOnes}`, type: 'error' });
+                    setMessage({ text: `Check: ${topNum} × ${botOnes}`, type: "error" });
                 }
             };
 
             const checkZero = () => {
-                if (row2[2] === '0') {
+                if (row2[gridCols - 1] === '0') {
                     playSuccess();
                     setStep(3);
-                    setMessage({ text: `Awesome! Now multiply ${topNum} x ${botTens}.`, type: 'success' });
-                    
-                    // Auto-focus the next available box (Tens place of row 2)
+                    setMessage({ text: `Now multiply ${topNum} × ${botTens}`, type: "neutral" });
                     setTimeout(() => {
-                         const nextBox = document.getElementById('r2-1');
-                         if(nextBox) nextBox.focus();
-                    }, 100);
-
+                        const el = document.getElementById(`r2-${gridCols-2}`);
+                        if(el) el.focus();
+                    }, 50);
                 } else {
                     playError();
-                    setMessage({ text: "Wait! Before we use the 'Tens Oven', we need a placeholder!", type: 'error' });
+                    setMessage({ text: "Place the Zero in the Ones place!", type: "error" });
                 }
             };
 
             const checkRow2 = () => {
-                const userVal = row2[0] + row2[1] + row2[2];
-                if (parseInt(userVal) === product2 * 10) {
+                const userVal = parseInt(row2.join('')) || 0;
+                if (userVal === prod2 * 10) { 
                     playSuccess();
                     setStep(4);
-                    setMessage({ text: "Perfect! Now add the two rows together.", type: 'neutral' });
+                    setMessage({ text: "Perfect! Add them up.", type: "neutral" });
                 } else {
                     playError();
-                    setMessage({ text: `Check the math! ${topNum} x ${botTens} = ?`, type: 'error' });
+                    setMessage({ text: `Check: ${topNum} × ${botTens}`, type: "error" });
                 }
             };
 
             const checkFinal = () => {
-                const userVal = final.map(d => d === '' ? '0' : d).join('');
-                if (parseInt(userVal) === finalAns) {
+                const userVal = parseInt(final.join('')) || 0;
+                if (userVal === finalAns) {
                     playSuccess();
                     setStep(5);
-                    setMessage({ text: "🎉 AMAZING JOB! You solved it! 🎉", type: 'success' });
+                    setScore(s => s + 1);
+                    setMessage({ text: "🎉 AMAZING!", type: "success" });
                 } else {
                     playError();
-                    setMessage({ text: "Check your addition carefully!", type: 'error' });
+                    setMessage({ text: "Check your addition!", type: "error" });
                 }
             };
 
+            const updateArr = (val, idx, arr, setArr) => {
+                const newArr = [...arr];
+                newArr[idx] = val;
+                setArr(newArr);
+            };
+
+            const renderOwlInGrid = (rowIndex, colIndex) => {
+                if (gameState !== 'playing' || step === 5) return null;
+                if (!isTwoDigitBot) return null;
+
+                const isBotOnesCell = colIndex === gridCols - 1;
+                const isBotTensCell = colIndex === gridCols - 2;
+
+                if (step === 1 && isBotTensCell) {
+                    return <div className="absolute inset-0 flex items-center justify-center bg-blue-500 text-white rounded owl-blocker text-xs z-10 pointer-events-none">🦉</div>;
+                }
+                if (step >= 3 && isBotOnesCell) {
+                    return <div className="absolute inset-0 flex items-center justify-center bg-blue-500 text-white rounded owl-blocker text-xs z-10 pointer-events-none">🦉</div>;
+                }
+                return null;
+            };
+
+            if (gameState === 'menu') {
+                return (
+                    <div className="min-h-screen flex flex-col items-center justify-center p-4 max-w-md mx-auto">
+                        <h1 className="text-4xl font-bold text-blue-600 mb-2 text-center">🦉 Owl Math Master</h1>
+                        <p className="text-gray-500 mb-8 font-semibold">Ultimate Edition</p>
+                        
+                        <div className="grid gap-4 w-full">
+                            <button onClick={()=>startGame(1)} className="bg-green-100 hover:bg-green-200 border-2 border-green-500 p-4 rounded-xl text-left shadow-sm active:scale-95 transition-transform">
+                                <div className="font-bold text-green-700 text-xl">🟢 Level 1: Foundation</div>
+                                <div className="text-sm text-green-600">Up to 4-digit × 1-digit</div>
+                            </button>
+                            <button onClick={()=>startGame(2)} className="bg-yellow-100 hover:bg-yellow-200 border-2 border-yellow-500 p-4 rounded-xl text-left shadow-sm active:scale-95 transition-transform">
+                                <div className="font-bold text-yellow-700 text-xl">🟡 Level 2: Big Numbers</div>
+                                <div className="text-sm text-yellow-600">Up to 8-digit × 1-digit</div>
+                            </button>
+                            <button onClick={()=>startGame(3)} className="bg-blue-100 hover:bg-blue-200 border-2 border-blue-500 p-4 rounded-xl text-left shadow-sm active:scale-95 transition-transform">
+                                <div className="font-bold text-blue-700 text-xl">🔵 Level 3: Dual Digits</div>
+                                <div className="text-sm text-blue-600">Up to 4-digit × 2-digit</div>
+                            </button>
+                            <button onClick={()=>startGame(4)} className="bg-red-100 hover:bg-red-200 border-2 border-red-500 p-4 rounded-xl text-left shadow-sm active:scale-95 transition-transform">
+                                <div className="font-bold text-red-700 text-xl">🔴 Level 4: Expert</div>
+                                <div className="text-sm text-red-600">Up to 7-digit × 2-digit</div>
+                            </button>
+                        </div>
+                    </div>
+                );
+            }
+
+            if (gameState === 'summary') {
+                 return (
+                    <div className="min-h-screen flex flex-col items-center justify-center p-4 max-w-md mx-auto text-center">
+                        <h1 className="text-4xl font-bold mb-4">🎉 Level Complete!</h1>
+                        <div className="text-6xl mb-6">{score >= 8 ? '🌟' : '👍'}</div>
+                        <p className="text-2xl font-bold text-gray-700 mb-2">Score: {score} / 10</p>
+                        <button onClick={()=>setGameState('menu')} className="bg-blue-600 text-white px-8 py-3 rounded-full font-bold shadow-lg hover:bg-blue-700 active:scale-95 transition-transform">
+                            Back to Menu
+                        </button>
+                    </div>
+                 );
+            }
+
             return (
-                <div className="flex flex-col items-center min-h-screen p-4 max-w-xl mx-auto">
+                <div className="min-h-screen flex flex-col items-center max-w-4xl mx-auto bg-gray-50 sm:bg-transparent">
                     {/* Header */}
-                    <div className="text-center mb-6">
-                        <h1 className="text-4xl font-bold text-blue-600 mb-2">🦉 Owl Math Master</h1>
-                        <div className={`p-3 rounded-lg font-semibold text-lg transition-colors duration-300 ${
-                            message.type === 'error' ? 'bg-red-100 text-red-700' : 
-                            message.type === 'success' ? 'bg-green-100 text-green-700' : 'bg-white text-gray-700 shadow-sm'
-                        }`}>
-                            {message.text}
+                    <div className="w-full flex justify-between items-center p-3 bg-white shadow-sm sm:rounded-b-xl sticky top-0 z-20">
+                        <button onClick={()=>setGameState('menu')} className="text-gray-400 font-bold text-sm px-2">✕ QUIT</button>
+                        <div className="flex flex-col items-center">
+                            <span className="text-xs font-bold text-gray-400">LEVEL {level}</span>
+                            <div className="flex gap-1 mt-1">
+                                {[...Array(10)].map((_, i) => (
+                                    <div key={i} className={`h-1.5 w-1.5 sm:h-2 sm:w-2 rounded-full ${i < problemNum ? (i < score + (problemNum-score) ? 'bg-blue-500' : 'bg-red-300') : 'bg-gray-200'}`}></div>
+                                ))}
+                            </div>
                         </div>
+                        <div className="font-mono font-bold text-blue-600 px-2">{score}/{problemNum-1}</div>
                     </div>
 
-                    {/* Main Board Area */}
-                    <div className="bg-white p-8 rounded-3xl shadow-2xl relative w-full max-w-sm border-b-8 border-gray-200">
-                        
-                        {/* THE OWL BLOCKER */}
-                        {step < 5 && (
-                            <div 
-                                className="owl-blocker absolute bg-blue-500 rounded-xl flex flex-col items-center justify-center text-white shadow-xl z-20"
-                                style={{
-                                    width: '55px',
-                                    height: '70px',
-                                    top: '135px', 
-                                    left: step === 0 || step === 1 ? '170px' : '230px', 
-                                    opacity: step === 0 ? 0 : 1,
-                                    transform: step === 0 ? 'scale(0)' : 'scale(1)'
-                                }}
-                            >
-                                <span className="text-3xl">🦉</span>
-                                <span className="text-[10px] font-bold mt-1">HIDE</span>
-                            </div>
-                        )}
+                    {/* Message Bar */}
+                    <div className={`w-full max-w-md text-center p-2 text-sm sm:text-base mb-2 sm:mb-4 sm:rounded-lg font-bold transition-colors ${
+                        message.type === 'error' ? 'bg-red-100 text-red-700' :
+                        message.type === 'success' ? 'bg-green-100 text-green-700' : 'bg-blue-50 text-blue-700'
+                    }`}>
+                        {message.text}
+                    </div>
 
-                        {/* MATH GRID */}
-                        <div className="grid grid-cols-4 gap-3 text-4xl font-mono leading-loose text-right mr-2 relative z-10">
-                            
-                            {/* Regrouping Area */}
-                            <div className="col-span-4 h-10 flex justify-center items-center relative">
-                                {step >= 1 && step < 3 && (
-                                    <div className="absolute top-0 right-[70px] text-red-500 font-bold text-2xl fade-in">
-                                        <span className="text-sm text-gray-400 mr-1">carry:</span>
-                                        <input 
-                                            className="w-8 text-center border-b-2 border-red-300 outline-none bg-transparent" 
-                                            maxLength="1"
-                                            value={carry}
-                                            onChange={(e) => setCarry(e.target.value)}
-                                        />
+                    {/* Main Grid Area - Scrollable Container */}
+                    <div className="flex-1 w-full flex flex-col items-center justify-center p-2 sm:p-4 overflow-hidden">
+                        <div className="bg-white p-3 sm:p-6 rounded-2xl shadow-lg w-full max-w-full overflow-x-auto no-scrollbar">
+                            <div className="min-w-min mx-auto">
+                                
+                                {/* Grid Container */}
+                                <div className="grid gap-1 sm:gap-2" 
+                                     style={{ 
+                                         // Dynamic Grid Sizing: 
+                                         // Mobile: min 28px per cell. Desktop: min 40px.
+                                         gridTemplateColumns: `repeat(${gridCols}, minmax(32px, 50px))` 
+                                     }}>
+                                    
+                                    {/* Carry Row */}
+                                    <div className="col-span-full h-6 sm:h-8 flex justify-end pr-2 relative mb-1">
+                                        {step > 0 && step < 5 && (
+                                            <div className="text-red-400 font-bold text-xs sm:text-sm flex gap-1 items-center">
+                                                <span>carry:</span>
+                                                <input 
+                                                    value={carry} onChange={e=>setCarry(e.target.value)} 
+                                                    className="w-12 border-b border-red-300 text-center outline-none bg-transparent" 
+                                                    inputMode="numeric"
+                                                />
+                                            </div>
+                                        )}
                                     </div>
-                                )}
+
+                                    {/* Top Number */}
+                                    {topDigits.map((d, i) => (
+                                        <div key={`top-${i}`} className="font-mono text-2xl sm:text-3xl font-bold text-gray-700 flex items-center justify-center h-10 sm:h-12">
+                                            {d}
+                                        </div>
+                                    ))}
+
+                                    {/* Bottom Number */}
+                                    {botDigits.map((d, i) => (
+                                        <div key={`bot-${i}`} className="relative font-mono text-2xl sm:text-3xl font-bold text-gray-800 flex items-center justify-center h-10 sm:h-12 border-b-2 sm:border-b-4 border-gray-800">
+                                            {i === 0 && <span className="absolute left-[-15px] sm:left-[-20px] text-gray-400 text-lg">×</span>}
+                                            {d}
+                                            {renderOwlInGrid(1, i)}
+                                        </div>
+                                    ))}
+
+                                    {/* Row 1 Inputs */}
+                                    {row1.map((val, i) => (
+                                        <div key={`r1-${i}`} className="flex justify-center items-center">
+                                            <InputCell 
+                                                val={val} idx={i} prefix="r1"
+                                                onChange={(v, idx)=>updateArr(v, idx, row1, setRow1)}
+                                                correctVal={p1Digits[i]}
+                                                disabled={step !== 1}
+                                            />
+                                        </div>
+                                    ))}
+
+                                    {/* Row 2 Inputs */}
+                                    {isTwoDigitBot && (
+                                        <>
+                                            <div className="col-span-full text-left text-gray-400 text-lg font-bold pl-1">+</div>
+                                            {row2.map((val, i) => (
+                                                <div key={`r2-${i}`} className="flex justify-center items-center">
+                                                    <InputCell 
+                                                        val={val} idx={i} prefix="r2"
+                                                        onChange={(v, idx)=>updateArr(v, idx, row2, setRow2)}
+                                                        correctVal={p2Digits[i]}
+                                                        disabled={step < 2 || step > 3 || (step === 2 && i !== gridCols - 1)}
+                                                        isZeroCheck={step === 2 && i === gridCols - 1}
+                                                    />
+                                                </div>
+                                            ))}
+                                        </>
+                                    )}
+
+                                    {/* Final Inputs */}
+                                    {isTwoDigitBot && (
+                                        <>
+                                            <div className="col-span-full border-b-2 sm:border-b-4 border-gray-800 my-1"></div>
+                                            {final.map((val, i) => (
+                                                <div key={`f-${i}`} className="flex justify-center items-center">
+                                                    <InputCell 
+                                                        val={val} idx={i} prefix="f"
+                                                        onChange={(v, idx)=>updateArr(v, idx, final, setFinal)}
+                                                        correctVal={fDigits[i]}
+                                                        disabled={step !== 4}
+                                                    />
+                                                </div>
+                                            ))}
+                                        </>
+                                    )}
+                                </div>
                             </div>
-
-                            {/* Top Number */}
-                            <div></div>
-                            <div></div>
-                            <div className="font-bold text-gray-800">{topTens}</div>
-                            <div className="font-bold text-gray-800">{topOnes}</div>
-
-                            {/* Bottom Number */}
-                            <div className="text-gray-400 text-2xl self-center">x</div>
-                            <div></div>
-                            <div className={`font-bold transition-colors ${step >= 2 && step <=3 ? 'text-blue-600 scale-110' : 'text-gray-800'}`}>{botTens}</div>
-                            <div className={`font-bold transition-colors ${step === 1 ? 'text-blue-600 scale-110' : 'text-gray-800'}`}>{botOnes}</div>
-
-                            {/* Divider Line */}
-                            <div className="col-span-4 border-b-4 border-gray-800 my-2 rounded-full"></div>
-
-                            {/* Row 1 Inputs */}
-                            <div className="self-center text-sm text-gray-400 font-sans">{step===1 && "Ones"}</div>
-                            {[0, 1, 2].map((i) => (
-                                <InputCell 
-                                    key={`r1-${i}`} 
-                                    val={row1[i]} 
-                                    onChange={handleRow1Change}
-                                    idx={i}
-                                    correctVal={p1Digits[i]} 
-                                    disabled={step !== 1}
-                                    rowPrefix="r1"
-                                />
-                            ))}
-
-                            {/* Row 2 Inputs */}
-                            <div className="self-center text-2xl text-gray-400">+</div>
-                            {[0, 1, 2].map((i) => (
-                                <InputCell 
-                                    key={`r2-${i}`} 
-                                    val={row2[i]} 
-                                    onChange={handleRow2Change} 
-                                    idx={i}
-                                    correctVal={p2Digits[i]} 
-                                    disabled={step < 2 || (step === 2 && i !== 2) || step > 3}
-                                    isZeroCheck={step === 2 && i === 2}
-                                    rowPrefix="r2"
-                                />
-                            ))}
-
-                            {/* Final Divider */}
-                            <div className="col-span-4 border-b-4 border-gray-800 my-2 rounded-full"></div>
-
-                            {/* Final Inputs */}
-                            <div className="self-center text-sm text-gray-400 font-sans">{step===4 && "Sum"}</div>
-                            {[0, 1, 2].map((i) => (
-                                <InputCell 
-                                    key={`f-${i}`} 
-                                    val={final[i]} 
-                                    onChange={handleFinalChange}
-                                    idx={i}
-                                    correctVal={fDigits[i]} 
-                                    disabled={step !== 4}
-                                    rowPrefix="f"
-                                />
-                            ))}
                         </div>
                     </div>
 
-                    {/* ACTION BUTTONS */}
-                    <div className="mt-8 w-full max-w-sm flex flex-col gap-3">
-                        {step === 0 && (
-                            <button onClick={() => {setStep(1); setMessage({text: "Step 1: Owl Down! Multiply Ones.", type: 'neutral'})}} 
-                                className="bg-blue-600 hover:bg-blue-700 text-white font-bold py-4 px-8 rounded-2xl shadow-lg text-xl transform transition hover:scale-105 active:scale-95">
-                                Start Problem {probIndex + 1}! 🚀
-                            </button>
-                        )}
-                        
+                    {/* Actions Panel - Fixed at bottom for mobile */}
+                    <div className="w-full bg-white p-3 shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.1)] z-30 sm:relative sm:shadow-none sm:bg-transparent sm:max-w-md sm:mb-4">
                         {step === 1 && (
-                            <button onClick={checkRow1} className="bg-blue-500 hover:bg-blue-600 text-white font-bold py-3 px-6 rounded-xl shadow-md transition transform active:scale-95">
-                                Check First Row
+                            <button onClick={checkRow1} className="w-full bg-blue-600 text-white font-bold py-3 sm:py-4 rounded-xl shadow-md text-lg active:scale-95 transition-transform">
+                                Check Row 1
                             </button>
                         )}
-
                         {step === 2 && (
-                            <div className="flex flex-col gap-2">
-                                <button onClick={checkZero} className="bg-yellow-500 hover:bg-yellow-600 text-white font-bold py-3 px-6 rounded-xl shadow-md transition transform active:scale-95 animate-pulse">
-                                    I Placed the Zero! 0️⃣
-                                </button>
-                            </div>
+                            <button onClick={checkZero} className="w-full bg-yellow-500 text-white font-bold py-3 sm:py-4 rounded-xl shadow-md text-lg animate-pulse active:scale-95">
+                                Place Zero 0️⃣
+                            </button>
                         )}
-
                         {step === 3 && (
-                            <button onClick={checkRow2} className="bg-blue-500 hover:bg-blue-600 text-white font-bold py-3 px-6 rounded-xl shadow-md transition transform active:scale-95">
-                                Check Second Row
+                            <button onClick={checkRow2} className="w-full bg-blue-600 text-white font-bold py-3 sm:py-4 rounded-xl shadow-md text-lg active:scale-95 transition-transform">
+                                Check Row 2
                             </button>
                         )}
-
                         {step === 4 && (
-                            <button onClick={checkFinal} className="bg-purple-600 hover:bg-purple-700 text-white font-bold py-3 px-6 rounded-xl shadow-md transition transform active:scale-95">
-                                Check Final Answer ✨
+                            <button onClick={checkFinal} className="w-full bg-purple-600 text-white font-bold py-3 sm:py-4 rounded-xl shadow-md text-lg active:scale-95 transition-transform">
+                                Check Final
                             </button>
                         )}
-
                         {step === 5 && (
-                             <div className="flex gap-2 justify-center">
-                                 <button onClick={() => resetGame(probIndex)} className="bg-gray-500 hover:bg-gray-600 text-white font-bold py-3 px-6 rounded-xl shadow-md mt-4">
-                                    Retry 🔄
-                                </button>
-                                <button onClick={nextProblem} className="bg-green-600 hover:bg-green-700 text-white font-bold py-3 px-6 rounded-xl shadow-md mt-4 transform transition hover:scale-105">
-                                    Next Problem ➡️
-                                </button>
-                            </div>
+                            <button onClick={handleNext} className="w-full bg-green-600 text-white font-bold py-3 sm:py-4 rounded-xl shadow-md text-lg active:scale-95 transition-transform flex items-center justify-center gap-2">
+                                Next ➡️
+                            </button>
                         )}
                     </div>
                 </div>
